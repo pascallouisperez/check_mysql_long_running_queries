@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# for long term plan, read https://chb2.kcprod.info:8444/display/main/Monitoring+Long+Running+SQL+Queries
 
 import MySQLdb, sys, re
 from optparse import OptionParser
