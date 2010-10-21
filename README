@@ -1,0 +1,27 @@
+usage: check_mysql_long_running_queries [options]
+
+options:
+  -h, --help  show this help message and exit
+  -H H        host
+  -P P        port
+  -t T        threshold
+  -u U        user
+  -p P        password
+  -e E        exclude queries containing comment
+  -c C        read credentials from a file.
+  -v          verbosity for debugging.
+
+Examples
+
+$ check_mysql_long_running_queries -u username -p password
+OK no long running queries
+
+$ check_mysql_long_running_queries -u username -p password
+WARNING long running query {'Info': 'update that kills the database', 'db': 'historical', 'State': 'Sending data', 'Host': 'localhost', 'Command': 'Query', 'User': 'username', 'Time': 400L, 'Id': 68829L}
+
+You can exclude queries by using the -e option and then issuing long running queries with
+
+  /*!99999 my_recognizable_comment */
+
+appended.
+
