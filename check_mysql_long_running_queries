@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+# for long term plan, read https://chb2.kcprod.info:8444/display/main/Monitoring+Long+Running+SQL+Queries
+
+import MySQLdb, sys, re
+from optparse import OptionParser
+
+def get_credentials(options):
+  user = options.u
+  pw   = options.p
+  if options.c:
+    try:
+      f = file(options.c)
+      r = f.read()
+      f.close()
+      comps = r.strip().split()
+      user = comps[0]
+      pw   = comps[1]
+    except:
+      raise Exception('Error reading credentials file.')
+
+  return (user, pw)    
+
+def fetch_full_processlist(options):
+  """
+  show processlist:
+  http://dev.mysql.com/doc/refman/5.0/en/show-processlist.html
+  Command field:
+  http://dev.mysql.com/doc/refman/5.0/en/thread-commands.html
+  comments syntax:
+  http://dev.mysql.com/doc/refman/5.0/en/comments.html
+  """
+  data = []
+  (user, pw) = get_credentials(options)
+  conn = MySQLdb.connect(
+      host = options.H,
+      port = options.P,
+      user = user,
+      passwd = pw,
+      db = "mysql")
+  cursor = conn.cursor()
+  cursor.execute ("show full processlist")
+  for row in cursor.fetchall():
+    data.append({
+        'Id':row[0], 'User':row[1], 'Host':row[2], 'db':row[3],
+        'Command':row[4], 'Time':row[5], 'State':row[6], 'Info':row[7]})
+  cursor.close()
+  conn.close()
+  return data
+
+allowed_commands = frozenset(['Sleep', 'Binlog', 'Connect', 'Binlog Dump'])
+def is_long_running_process(options, process):
+  if process['Time'] < options.t:
+    return False
+  if process['Command'] in allowed_commands:
+    return False
+  if options.e != None and re.search("\*.*%s.*\*" % options.e, process['Info']) != None:
+    return False
+  return True
+
+def main():
+  parser = OptionParser()
+  parser.add_option("-H", help="host", default="localhost")
+  parser.add_option("-P", help="port", type="int", default=3306)
+  parser.add_option("-t", help="threshold", type="int", default=60)
+  parser.add_option("-u", help="user", default="root")
+  parser.add_option("-p", help="password", default="")
+  parser.add_option("-e", help="exclude queries containing comment")
+  parser.add_option("-c", help="read credentials from a file.")
+  parser.add_option("-v", action="store_true", default=False, help="verbosity for debugging.")
+  (options, args) = parser.parse_args()
+
+  # monitoring fun
+  try:
+    if options.v:
+      print 'Id User Host db Command Time State Info'
+    for process in fetch_full_processlist(options):
+      if options.v:
+        p = process
+        print '%s %s %s %s %s %s %s %s' % \
+          (p['Id'],p['User'],p['Host'],p['db'],p['Command'],p['Time'],p['State'],p['Host'])
+      if is_long_running_process(options, process):
+        print "WARNING long running query %s" % process
+        print sys.exit(1)
+    print "OK no long running queries"
+  except Exception, e:
+    print e
+    print "CRITICAL %s" % e
+    print sys.exit(2)
+
+if __name__ == "__main__":
+  main()
